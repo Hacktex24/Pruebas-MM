@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Tabla de ajustes - Niveladora</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+            color: #222;
+        }
+        h1 { margin-bottom: 5px; }
+        h2 { margin-top: 25px; font-size: 1.1rem; }
+
+        .panel-filtros {
+            margin: 15px 0;
+            padding: 10px 15px;
+            background: #ffffff;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            display: inline-block;
+        }
+        .panel-filtros label { font-size: 0.9rem; margin-right: 8px; }
+        .panel-filtros input {
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .info-puntos { font-size: 0.85rem; margin-top: 8px; }
+        .info-puntos span.badge {
+            display:inline-block; padding:2px 6px; border-radius:4px;
+            background:#ffe6c2; border:1px solid #f0b36a;
+            font-size:0.75rem; margin-right:4px;
+        }
+        .info-puntos ul { margin:6px 0 0 0; padding-left:18px; }
+        .info-puntos li { margin-bottom:2px; }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        thead { background:#e9edf5; }
+        th, td {
+            border:1px solid #d0d7e2; padding:6px 8px;
+            text-align:center; font-size:0.85rem;
+        }
+        tbody tr:nth-child(even){ background:#fafafa; }
+        tbody tr.oculto{ display:none; }
+
+        .punto-real {
+            background:#ffe6c2 !important;
+            font-weight:700;
+        }
+        .punto-real::after {
+            content:"★"; font-size:0.7rem; margin-left:3px; color:#d17a00;
+        }
+    </style>
+</head>
+<body>
+<h1>Tabla de ajustes para niveladora / intermesh</h1>
+<p>Valores en mm (rango: −3.0 a +3.0). Entrada = salida.</p>
+
+<h2>Puntos reales registrados en esta sesión</h2>
+<div class="info-puntos">
+    <span class="badge">Puntos reales</span>
+    <ul>
+        <li>NPM1010M(HR) — espesor 2.0 mm — tensión 1010 — valor −2.0 mm</li>
+        <li>SCGA1180DUB-45 — espesor 2.3 mm — tensión 1180 — valor +1.0 mm</li>
+        <li>NPM1020M — espesor 1.4 mm — tensión 1020 — valor −1.0 mm</li>
+        <li>TE440D-A — espesor 4.0 mm — tensión 440 — valor −1.95 mm</li>
+        <li>JAC590R — espesor 1.55 mm — tensión 590 — valor −0.5 mm</li>
+        <li>SP251-590PQ — espesor 2.9 mm — tensión 590 — valor −1.0 mm</li>
+        <li>JSH270E — espesor 6.0 mm — tensión 270 — valor −2.7 mm</li>
+        <li>NPH290 — espesor 2.28 mm — tensión 290 — valor −1.0 mm</li>
+        <li>JAC440W — espesor 1.2 mm — tensión 440 — valor −0.6 mm</li>
+        <li>SPH780FC-OD — espesor 2.6 mm — tensión 780 — valor −1.5 mm</li>
+    </ul>
+</div>
+
+<div class="panel-filtros">
+    <label for="filtroEspesor">Filtrar por espesor:</label>
+    <input type="text" id="filtroEspesor" placeholder="Ej. 2.60">
+</div>
+
+<table id="tablaAjustes">
+    <thead><tr id="filaEncabezados"></tr></thead>
+    <tbody id="cuerpoTabla"></tbody>
+</table>
+
+<script>
+/* ==================== Datos base ==================== */
+// Familias estándar de espesor + todos los espesores de pruebas (mm)
+let espesores = [
+    0.95,
+    1.2,
+    1.4,
+    1.5,
+    1.55,
+    2.0,
+    2.28,
+    2.3,
+    2.5,
+    2.6,
+    2.9,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0,
+    5.5,
+    6.0,
+    6.5,
+    7.0
+];
+espesores = [...new Set(espesores)].sort((a,b)=>a-b);
+
+// Familias de tensión base (360 → 1180) + tensiones de pruebas
+let tensiones = [360, 510, 660, 810, 960, 1110, 1180];
+const tensionesExtra = [270, 290, 440, 590, 780, 1010, 1020];
+tensionesExtra.forEach(t => tensiones.push(t));
+tensiones = [...new Set(tensiones)].sort((a,b)=>a-b);
+
+// Puntos reales fijos
+const puntosReales = [
+    {material:"NPM1010M(HR)", espesor:2.0,  tension:1010, valor:-2.0},
+    {material:"SCGA1180DUB-45", espesor:2.3,  tension:1180, valor: 1.0},
+    {material:"NPM1020M",       espesor:1.4,  tension:1020, valor:-1.0},
+    {material:"TE440D-A",       espesor:4.0,  tension:440,  valor:-1.95},
+    {material:"JAC590R",        espesor:1.55, tension:590,  valor:-0.5},
+    {material:"SP251-590PQ",    espesor:2.9,  tension:590,  valor:-1.0},
+    {material:"JSH270E",        espesor:6.0,  tension:270,  valor:-2.7},
+    {material:"NPH290",         espesor:2.28, tension:290,  valor:-1.0},
+    {material:"JAC440W",        espesor:1.2,  tension:440,  valor:-0.6},
+    {material:"SPH780FC-OD",    espesor:2.6,  tension:780,  valor:-1.5}
+];
+
+// Mapa rápido para saber si una celda es punto real
+const mapaPuntos = {};
+puntosReales.forEach(p=>{
+    mapaPuntos[`${p.espesor.toFixed(3)}|${p.tension}`] = p.valor;
+});
+
+/* ==================== Modelo numérico (IDW) ==================== */
+function clamp(v){ return Math.max(-3, Math.min(3, v)); }
+
+function distNorm(e,t,p){
+    // 0.5 mm ~ 1 unidad, 150 N/mm² ~ 1 unidad
+    const de = (e - p.espesor)/0.5;
+    const dt = (t - p.tension)/150;
+    return Math.sqrt(de*de + dt*dt);
+}
+
+function calcValor(e,t){
+    const clave = `${e.toFixed(3)}|${t}`;
+    if(mapaPuntos[clave] !== undefined) return clamp(mapaPuntos[clave]);
+
+    let sw=0, sv=0;
+    puntosReales.forEach(p=>{
+        const d = distNorm(e,t,p);
+        const w = 1/(d*d + 1e-6);   // peso inverso al cuadrado
+        sw += w;
+        sv += w * p.valor;
+    });
+    return clamp(sv / sw);
+}
+
+/* ==================== Construcción de la tabla ==================== */
+const head = document.getElementById("filaEncabezados");
+const body = document.getElementById("cuerpoTabla");
+
+// Encabezados
+const th0 = document.createElement("th");
+th0.textContent = "Espesor / Tensión (N/mm²)";
+head.appendChild(th0);
+
+tensiones.forEach(t=>{
+    const th = document.createElement("th");
+    th.textContent = t;
+    head.appendChild(th);
+});
+
+// Filas
+espesores.forEach(e=>{
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-espesor", e.toFixed(2));
+
+    const th = document.createElement("th");
+    th.textContent = e.toFixed(2) + " mm";
+    tr.appendChild(th);
+
+    tensiones.forEach(t=>{
+        const td = document.createElement("td");
+        const clave = `${e.toFixed(3)}|${t}`;
+        let v;
+
+        if(mapaPuntos[clave] !== undefined){
+            v = mapaPuntos[clave];
+            td.classList.add("punto-real");
+            td.title = "Punto real medido en línea";
+        } else {
+            v = calcValor(e,t);
+        }
+
+        td.textContent = v.toFixed(1);
+        tr.appendChild(td);
+    });
+
+    body.appendChild(tr);
+});
+
+/* ==================== Filtro por espesor ==================== */
+document.getElementById("filtroEspesor").addEventListener("input", ()=>{
+    const f = document.getElementById("filtroEspesor").value.trim();
+    document.querySelectorAll("#cuerpoTabla tr").forEach(r=>{
+        const e = r.getAttribute("data-espesor");
+        r.classList.toggle("oculto", f !== "" && !e.includes(f));
+    });
+});
+</script>
+
+</body>
+</html>
